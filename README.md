@@ -1,4 +1,5 @@
-# Columbia MSDS Capstone: JPMC2_Semi_Supervised_NLP
+# Semi-supervised_learning_for_part_of_speech_tagging
+## NLP Capstone Project with Columbia University and J.P. Morgan
 
 ## Preparations
 ### Dependencies Preparations
@@ -41,11 +42,7 @@ Make sure you have the following directories in the root before running the scri
 ├── model
 |   └── base_model.pt (downloaded from Google Drive)
 └── plots
-```
-if you find your repo missing any of those directories, run the command 
-```
-mkdir <dir_name>
-```
+
 
 ## Directory Structure
 Here follows the brief introduction about the specific details for each directory:
@@ -57,8 +54,3 @@ Here follows the brief introduction about the specific details for each director
 6. pickles: store the serialized python object after self-training for future usages.
 
 ## Results
-### Online-nonfixed
-1. For the metrics tracker of each domain, we save the results of the precision, f1, recall, and accuracy for each parameter settings as a csv file at `metrics/online_nonfixed/"` following the naming convention of `online_nonfixed_{domain}_{topn_percent}_{threshold_ratio}_{lr}.csv`.   
-2. For the `acc_lst` and `prob_lst` tracker of each domain, we save the results for each parameter settings as a binary pickle file at `pickles/online_nonfixed/` following the naming convention of
-    - `acc_lst_{domain}_{topn_percent}_{threshold_ratio}_{lr}.pkl`    
-    - `prob_lst_{domain}_{topn_percent}_{threshold_ratio}_{lr}.pkl`   
