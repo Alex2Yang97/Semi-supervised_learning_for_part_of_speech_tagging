@@ -18,10 +18,26 @@ pip install -r requirements.txt
 
 ### Directory Preparation
 Make sure you have the following directories in the root before running the script
-```
+
+```bash
 .
+├── Analysis_int_res.ipynb
+├── Analysis_output_Online_fixed_self_learning.ipynb
+├── Analysis_output_Online_nonfixed_self_learning.ipynb
+├── LICENSE
+├── Online_fixed_self_learning_v5.ipynb
+├── Online_nonfixed_self_learning_v5.ipynb
+├── Online_token_self_learning_v5.ipynb
+├── README.md
+├── Scratch_fixed_self_learning_v5.ipynb
+├── Scratch_nonfixed_self_learning_v5.ipynb
+├── Scratch_token_self_learning_v5.ipynb
+├── analysis.py
+├── build_model.py
+├── create_pseudo_data.py
+├── create_pseudo_data_by_tokens.py
 ├── data
-│   └── gweb_sancl (downloaded from Google Drive)
+│   └── gweb_sancl
 │       ├── pos_fine
 │       │   ├── answers
 │       │   ├── emails
@@ -30,18 +46,19 @@ Make sure you have the following directories in the root before running the scri
 │       │   ├── weblogs
 │       │   └── wsj
 │       └── unlabeled
+│           └── gweb-answers.unlabeled.txt
 ├── docs
+├── intermediate_result
 ├── metrics
-├── pickles
-├── mid_data_process
-│   └── gweb_sancl
-│       ├── pos_fine
-│       │   ├── answers
-│       │   └── wsj
-│       └── unlabeled
 ├── model
-|   └── base_model.pt (downloaded from Google Drive)
-└── plots
+├── plots_tags
+├── requirements.txt
+├── result
+├── scripts
+├── setup.sh
+└── utils.py
+
+```
 
 
 ## Directory Structure
