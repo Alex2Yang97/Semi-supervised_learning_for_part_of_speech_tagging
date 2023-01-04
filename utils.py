@@ -11,15 +11,24 @@ import os
 import codecs
 
 
+# Raw data folders
 PJ_DIR = os.path.dirname(os.path.realpath(__file__))
 DATA_DIR = os.path.join(PJ_DIR, "data", "gweb_sancl")
-WSJ_DIR = os.path.join(DATA_DIR, "pos_fine", "wsj")
+
+POS_FINE_DIR = os.path.join(DATA_DIR, "pos_fine")
+UNLABELED_DIR = os.path.join(DATA_DIR, "unlabeled")
+
+PF_WSJ_DIR = os.path.join(POS_FINE_DIR, "wsj")
+
+# User's folders
 MODEL_DIR = os.path.join(PJ_DIR, "model")
 INT_RESULT_DIR = os.path.join(PJ_DIR, "intermediate_result")
 RESULT_DIR = os.path.join(PJ_DIR, "result")
 METRICS_DIR = os.path.join(PJ_DIR, "metrics")
 PLOT_TAGS_DIR = os.path.join(PJ_DIR, "plots_tags")
 
+
+DOMAIN_LST = ["answers", "emails", "newsgroups", "reviews", "weblogs"]
 
 def read_conll_file(file_name, raw=False):
     """
@@ -81,10 +90,22 @@ def read_data(data_file):
     return word_lst, tag_lst, list(set(tags))
 
 
+def read_unlabeled_data(file_path, max_unlabeled=False):
+  data = []
+  with open(file_path, 'rb') as f:
+    for line in f:
+      if max_unlabeled and len(data) == max_unlabeled:
+        break
+      line = line.decode('utf-8','ignore').strip().split()
+      data.append(line)
+  print('Loaded... {} unlabeled instances'.format(len(data)))
+  return data
+  
+
 # Read wsj data
-wsj_train_file = os.path.join(WSJ_DIR, "gweb-wsj-train.conll")
-wsj_dev_file = os.path.join(WSJ_DIR, "gweb-wsj-dev.conll")
-wsj_test_file = os.path.join(WSJ_DIR, "gweb-wsj-test.conll")
+wsj_train_file = os.path.join(PF_WSJ_DIR, "gweb-wsj-train.conll")
+wsj_dev_file = os.path.join(PF_WSJ_DIR, "gweb-wsj-dev.conll")
+wsj_test_file = os.path.join(PF_WSJ_DIR, "gweb-wsj-test.conll")
 wsj_train_word_lst, wsj_train_tag_lst, wsj_train_tag_set = read_data(wsj_train_file)
 wsj_dev_word_lst, wsj_dev_tag_lst, wsj_dev_tag_set = read_data(wsj_dev_file)
 wsj_test_word_lst, wsj_test_tag_lst, wsj_test_tag_set = read_data(wsj_test_file)
