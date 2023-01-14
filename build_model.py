@@ -31,10 +31,57 @@ TOKENIZER = BertTokenizer.from_pretrained('bert-base-cased', do_lower_case=False
 
 class PosDataset(data.Dataset):
     def __init__(self, word_lst, tag_lst):
+        if not tag_lst:
+            sents, tags_li = [], [] # list of lists
+            for i in range(len(word_lst)):
+                sents.append(["[CLS]"] + word_lst[i] + ["[SEP]"])
+                tags_li.append(["<pad>"] + ['$']*len(word_lst[i]) + ["<pad>"])
+        else:
+            sents, tags_li = [], [] # list of lists
+            for i in range(len(word_lst)):
+                sents.append(["[CLS]"] + word_lst[i] + ["[SEP]"])
+                tags_li.append(["<pad>"] + tag_lst[i] + ["<pad>"])
+        self.sents, self.tags_li = sents, tags_li
+
+    def __len__(self):
+        return len(self.sents)
+
+    def __getitem__(self, idx):
+        words, tags = self.sents[idx], self.tags_li[idx] # words, tags: string list
+
+        # We give credits only to the first piece.
+        x, y = [], [] # list of ids
+        is_heads = [] # list. 1: the token is the first piece of a word
+        for w, t in zip(words, tags):
+            tokens = TOKENIZER.tokenize(w) if w not in ("[CLS]", "[SEP]") else [w]
+            xx = TOKENIZER.convert_tokens_to_ids(tokens)
+
+            is_head = [1] + [0]*(len(tokens) - 1)
+
+            t = [t] + ["<pad>"] * (len(tokens) - 1)  # <PAD>: no decision
+            yy = [TAG2IDX[each] for each in t]  # (T,)
+
+            x.extend(xx)
+            is_heads.extend(is_head)
+            y.extend(yy)
+
+        assert len(x)==len(y)==len(is_heads), "len(x)={}, len(y)={}, len(is_heads)={}".format(len(x), len(y), len(is_heads))
+
+        # seqlen
+        seqlen = len(y)
+
+        # to string
+        words = " ".join(words)
+        tags = " ".join(tags)
+        return words, x, is_heads, tags, y, seqlen
+
+
+class UnlabeledDataset(data.Dataset):
+    def __init__(self, word_lst):
         sents, tags_li = [], [] # list of lists
         for i in range(len(word_lst)):
             sents.append(["[CLS]"] + word_lst[i] + ["[SEP]"])
-            tags_li.append(["<pad>"] + tag_lst[i] + ["<pad>"])
+            tags_li.append(["<pad>"] + ['$']*len(word_lst[i]) + ["<pad>"])
         self.sents, self.tags_li = sents, tags_li
 
     def __len__(self):
@@ -119,6 +166,39 @@ class Net(nn.Module):
         y_hat = logits.argmax(-1)
         return logits, y, y_hat
 
+
+def train_one_epoch(model, iterator, optimizer, loss_fn, epoch_index, tb_writer=None):
+    running_loss = 0.
+    last_loss = 0.
+
+    for i, batch in enumerate(iterator):
+      words, x, is_heads, tags, y, seqlens = batch
+      
+      optimizer.zero_grad()
+
+      # logits, y, y_hat
+      logits, y, _ = model(x, y) # logits: (N, T, VOCAB), y: (N, T)
+
+      logits = logits.view(-1, logits.shape[-1]) # (N*T, VOCAB)
+      y = y.view(-1)  # (N*T,)
+
+      loss = loss_fn(logits, y)
+      loss.backward()
+
+      optimizer.step()
+
+      # Gather data and report
+      running_loss += loss.item()
+      if (i+1) % 500 == 0:
+        last_loss = running_loss / 1000 # loss per batch
+        print('  batch {} loss: {}'.format(i + 1, last_loss))
+        tb_x = epoch_index * len(iterator) + i + 1
+        if tb_writer:
+          tb_writer.add_scalar('Loss/train', last_loss, tb_x)
+        running_loss = 0.
+      
+    return last_loss
+    
 
 def train(model, iterator, optimizer, criterion):
     model.train()

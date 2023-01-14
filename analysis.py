@@ -6,8 +6,8 @@
 #  * @desc [description]
 #  */
 
-
-from utils import TAG2IDX, IDX2TAG
+import os
+from utils import TAG2IDX, IDX2TAG, RESULT_DIR
 from build_model import DEVICE
 
 import torch
@@ -20,11 +20,14 @@ from torchmetrics.functional.classification import multiclass_accuracy
 import seaborn as sns
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
+import plotly.express as px
 from plotly.subplots import make_subplots
 
 torch.manual_seed(0)
 
-def save_sns_fig(each_class_df, output_plot_file):
+base_model_result = os.path.join(RESULT_DIR, "Base_model_result")
+
+def save_sns_fig(each_class_df, output_plot_file, title=None):
 
   fig = plt.figure(figsize=(20,6))
 
@@ -42,6 +45,8 @@ def save_sns_fig(each_class_df, output_plot_file):
   sns.lineplot(data=each_class_df, x="POS_tags", y="acc")
   sns.scatterplot(data=each_class_df, x="POS_tags", y="acc")
   plt.xticks(rotation=45, size=10)
+  if title:
+    plt.title(title)
 
   ax2 = plt.twinx()
   sns.barplot(data=each_class_df, x="POS_tags", y="cnt", alpha=0.5, ax=ax2)
@@ -85,7 +90,7 @@ def save_plotly_fig(each_class_df, output_plot_file):
 
 def analysis_output(
     output_res_file, csvsave=False, pngsave=False, csv_file_name=None, output_plot_name=None, 
-    tag2idx=TAG2IDX, idx2tag=IDX2TAG, device=DEVICE):
+    figtitle=None, tag2idx=TAG2IDX, idx2tag=IDX2TAG, device=DEVICE):
 
   y_true =  np.array([tag2idx[line.split()[1]] for line in open(output_res_file, 'r').read().splitlines() if len(line) > 0])
   y_pred =  np.array([tag2idx[line.split()[2]] for line in open(output_res_file, 'r').read().splitlines() if len(line) > 0])
@@ -108,9 +113,58 @@ def analysis_output(
   each_class_df["POS_tags"] = each_class_df["POS_id"].apply(lambda x: idx2tag[x])
   each_class_df = each_class_df[each_class_df["POS_tags"] != '<pad>'].reset_index(drop=True)
 
+  tag_cnt_file = os.path.join(base_model_result, "tag_cnt_df.csv")
+  tag_cnt_df = pd.read_csv(tag_cnt_file)[["POS_tags", "wsj_cnt"]]
+
+  each_class_df = pd.merge(tag_cnt_df, each_class_df, on="POS_tags", how="left")
+  each_class_df = each_class_df.fillna(0)
+
   if csvsave:
     each_class_df.to_csv(csv_file_name, index=False)
   if pngsave:
-    save_sns_fig(each_class_df, output_plot_name)
+    save_sns_fig(each_class_df, output_plot_name, title=figtitle)
 
   return each_class_df
+
+
+def plot_metric(precision, recall, f1, acc, metric_plot_path, title="", show=False, save=True):
+
+  test_metric = pd.DataFrame({
+      "Loop": list(range(len(precision))) * 4,
+      "metric": ["precision"]*len(precision) + ["recall"]*len(recall) + ["f1"]*len(f1) + ["accuracy"]*len(acc),
+      "value": precision + recall + f1 + acc
+  })
+
+  fig = px.line(test_metric, x="Loop", y="value", color='metric', markers=True, title=title)
+  if save:
+    fig.write_image(metric_plot_path, scale = 6, width = 1000, height = 500)
+  if show:
+    fig.show()
+  return test_metric
+
+
+def make_plot_metric(
+    metrics_df, sub_metrics_dir, name, show=False, save=True):
+  metric_plot_path = os.path.join(sub_metrics_dir, f"average-{name}.png")
+  title = f"Metrics - average - {name}"
+  _ = plot_metric(
+      metrics_df["avg_domain_prec_lst"].tolist(), metrics_df["avg_domain_rec_lst"].tolist(), 
+      metrics_df["avg_domain_f1_lst"].tolist(), metrics_df["avg_domain_acc_lst"].tolist(),
+      metric_plot_path, title=name, show=show, save=save
+      )
+  
+  metric_plot_path = os.path.join(sub_metrics_dir, f"micro-{name}.png")
+  title = f"Metrics - micro - {name}"
+  _ = plot_metric(
+      metrics_df["micro_domain_prec_lst"].tolist(), metrics_df["micro_domain_rec_lst"].tolist(), 
+      metrics_df["micro_domain_f1_lst"].tolist(), metrics_df["micro_domain_acc_lst"].tolist(),
+      metric_plot_path, title=name, show=show, save=save
+      )
+  
+  metric_plot_path = os.path.join(sub_metrics_dir, f"macro-{name}.png")
+  title = f"Metrics - macro - {name}"
+  _ = plot_metric(
+      metrics_df["macro_domain_prec_lst"].tolist(), metrics_df["macro_domain_rec_lst"].tolist(), 
+      metrics_df["macro_domain_f1_lst"].tolist(), metrics_df["macro_domain_acc_lst"].tolist(),
+      metric_plot_path, title=name, show=show, save=save
+      )

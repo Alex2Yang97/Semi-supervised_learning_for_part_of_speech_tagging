@@ -118,4 +118,94 @@ def gen_pseudo_data_for_token(
 
   return (top_words, top_tags, top_pseudo_tags, top_prob_pseudo_tags, top_prob, top_acc,
           remain_words, remain_tags, remain_pseudo_tags, remain_prob_pseudo_tags, remain_prob, remain_acc)
+
+
+def gen_pseudo_data_for_token_by_unlabel(
+    model, unlabeled_domain_dataset, topn=300, save_output=False, output_file=None,
+    device=DEVICE, num_classes=len(IDX2TAG), idx2tag=IDX2TAG):
   
+  model.eval()
+
+  new_words_lst = []
+  new_tags_lst = []
+  pseudo_tags_lst = []
+  prob_pseudo_tags_lst = []
+  all_mean_prob_lst = []
+
+  with torch.no_grad():
+      for i, batch in enumerate(unlabeled_domain_dataset):
+
+        words, x, is_heads, tags, y, _ = batch
+
+        # When calculating the length of sentences, ignore <pad>
+        sen_len = y.bool().sum(axis=1)
+
+        logits, y, y_hat = model(x, y)  # y_hat: (N, T)
+
+        # Save prediction as new training dataset
+        softmax_value = torch.softmax(logits, dim=2)
+        max_prob = torch.amax(softmax_value, dim=2)
+
+        # Rank by mean probability
+        res_prob = y.bool().to(device) * max_prob.to(device)
+        sum_prob = res_prob.sum(axis=1)
+        mean_prob = sum_prob / sen_len.to(device)
+        all_mean_prob_lst.extend(mean_prob.tolist())
+        
+        new_words = []
+        new_tags = []
+        pseudo_tags = []
+        prob_pseudo_tags = []
+
+        for words_i, tags_i, ishead_i, yhat_i, maxprob_i in zip(words, tags, is_heads, y_hat, max_prob):
+          new_words.append(words_i.split()[1: -1])
+          new_tags.append(tags_i.split()[1: -1])
+
+          yhat_i = yhat_i.cpu().numpy().tolist()
+          select_y_hat = [hat for head, hat in zip(ishead_i, yhat_i) if head == 1]
+          preds = [idx2tag[hat] for hat in select_y_hat][1: -1]
+          pseudo_tags.append(preds)
+
+          maxprob_i = maxprob_i.cpu().numpy().tolist()
+          select_maxprob = [prob for head, prob in zip(ishead_i, maxprob_i) if head == 1][1: -1]
+          prob_pseudo_tags.append(select_maxprob)
+          
+          assert len(select_maxprob)==len(preds)==len(words_i.split()[1: -1])==len(tags_i.split()[1: -1])
+
+        new_words_lst.extend(new_words)
+        new_tags_lst.extend(new_tags)
+        pseudo_tags_lst.extend(pseudo_tags)
+        prob_pseudo_tags_lst.extend(prob_pseudo_tags)
+
+  assert len(new_words_lst)==len(new_tags_lst)==len(pseudo_tags_lst)==len(prob_pseudo_tags_lst)
+
+  ind = list(range(len(all_mean_prob_lst)))
+  ind = [x for _, x in sorted(zip(all_mean_prob_lst, ind), reverse=True, key=lambda x: x[0])]
+  prob_lst = [all_mean_prob_lst[i] for i in ind]
+
+  select_ind = ind[: topn] # The index of topn sentences
+  not_select_ind = ind[topn: ]
+
+  top_words = [new_words_lst[i] for i in select_ind]
+  top_tags = [new_tags_lst[i] for i in select_ind]
+  top_pseudo_tags = [pseudo_tags_lst[i] for i in select_ind]
+  top_prob_pseudo_tags = [prob_pseudo_tags_lst[i] for i in select_ind]
+
+  # Save intermediate result - top n 
+  if save_output:
+    with open(output_file, 'w') as fout:
+      for top_words_i, top_pseudo_tags_i, top_prob_pseudo_tags_i in zip(top_words, top_pseudo_tags, top_prob_pseudo_tags):
+        for w, p, mp in zip(top_words_i, top_pseudo_tags_i, top_prob_pseudo_tags_i):
+          fout.write("{} {} {}\n".format(w, p, mp))
+        fout.write("\n")
+
+  remain_words = [new_words_lst[i] for i in not_select_ind]
+  remain_tags = [new_tags_lst[i] for i in not_select_ind]
+  remain_pseudo_tags = [pseudo_tags_lst[i] for i in not_select_ind]
+  remain_prob_pseudo_tags = [prob_pseudo_tags_lst[i] for i in not_select_ind]
+
+  top_prob = prob_lst[: topn]
+  remain_prob = prob_lst[topn: ]
+  
+  return (top_words, top_tags, top_pseudo_tags, top_prob_pseudo_tags, top_prob,
+          remain_words, remain_tags, remain_pseudo_tags, remain_prob_pseudo_tags, remain_prob)

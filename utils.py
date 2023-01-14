@@ -9,6 +9,11 @@
 
 import os
 import codecs
+from pytorch_pretrained_bert import BertTokenizer, BertModel
+
+import torch
+torch.manual_seed(0)
+TOKENIZER = BertTokenizer.from_pretrained('bert-base-cased', do_lower_case=False)
 
 
 # Raw data folders
@@ -90,14 +95,34 @@ def read_data(data_file):
     return word_lst, tag_lst, list(set(tags))
 
 
-def read_unlabeled_data(file_path, max_unlabeled=False):
+def clean_unlabeled_sentence(sen, show=False):
+  x = []
+  is_heads = []
+
+  for w in sen:
+    tokens = TOKENIZER.tokenize(w) if w not in ("[CLS]", "[SEP]") else [w]
+    xx = TOKENIZER.convert_tokens_to_ids(tokens)
+    is_head = [1] + [0]*(len(tokens) - 1)
+    x.extend(xx)
+    is_heads.extend(is_head)
+  if len(x) == len(is_heads) and len(x) <= 512:
+    return sen
+  else:
+    if show:
+      print("Invalid sentence", sen)
+    return []
+
+
+def read_unlabeled_data(file_path, max_unlabeled=False, show=False):
   data = []
   with open(file_path, 'rb') as f:
     for line in f:
       if max_unlabeled and len(data) == max_unlabeled:
         break
       line = line.decode('utf-8','ignore').strip().split()
-      data.append(line)
+      line = clean_unlabeled_sentence(line, show=show)
+      if line:
+        data.append(line)
   print('Loaded... {} unlabeled instances'.format(len(data)))
   return data
   
@@ -154,14 +179,9 @@ def create_sub_dir(domain, method_name="Online_fixed_self_learning"):
         os.makedirs(sub_result_dir)
         print("Create", sub_result_dir)
 
-    sub_plots_tags_dir = os.path.join(PLOT_TAGS_DIR, method_name, domain)
-    if not os.path.isdir(sub_plots_tags_dir):
-        os.makedirs(sub_plots_tags_dir)
-        print("Create", sub_plots_tags_dir)
-
     sub_int_res_dir = os.path.join(INT_RESULT_DIR, method_name, domain)
     if not os.path.isdir(sub_int_res_dir):
         os.makedirs(sub_int_res_dir)
         print("Create", sub_int_res_dir)
     
-    return sub_model_dir, sub_metrics_dir, sub_result_dir, sub_plots_tags_dir, sub_int_res_dir
+    return sub_model_dir, sub_metrics_dir, sub_result_dir, sub_int_res_dir
