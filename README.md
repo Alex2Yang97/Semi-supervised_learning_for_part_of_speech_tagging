@@ -1,6 +1,8 @@
 # Semi-supervised_learning_for_part_of_speech_tagging
 ## NLP Capstone Project with Columbia University and J.P. Morgan
 
+**Please check dev branch for the latest version.**
+
 ## Preparations
 ### Dependencies Preparations
 0. (Ignore this step) Check the cuda version on GCP as 
