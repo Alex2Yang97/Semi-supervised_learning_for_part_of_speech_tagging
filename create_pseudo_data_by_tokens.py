@@ -209,3 +209,39 @@ def gen_pseudo_data_for_token_by_unlabel(
   
   return (top_words, top_tags, top_pseudo_tags, top_prob_pseudo_tags, top_prob,
           remain_words, remain_tags, remain_pseudo_tags, remain_prob_pseudo_tags, remain_prob)
+
+
+def select_topn_each_tag(top_tags, top_pseudo_tags, top_prob_pseudo_tags, 
+                         cnt_non_ignored_tokens, token_topn, min_tag_cnt=100, 
+                         save=False, save_dict_path=None):
+  each_tags_dict = defaultdict(list)
+  for tags, pseudo_tags, probs in zip(top_tags, top_pseudo_tags, top_prob_pseudo_tags):
+    for  tag, pseudo_tag, prob in zip(tags, pseudo_tags, probs):
+      if tag != '<pad>':
+        if pseudo_tag != "<pad>":
+          each_tags_dict[pseudo_tag].append(prob)
+        else:
+          pad_cnt += 1
+
+  thresholds_dict = defaultdict(float)
+  select_tag_dict = defaultdict(list)
+  for tag, tag_prob_lst in each_tags_dict.items():
+    nlen = len(tag_prob_lst)
+    if nlen > min_tag_cnt:
+      select_topn = int((nlen / cnt_non_ignored_tokens * token_topn))
+      if select_topn >= nlen:
+        select_topn = nlen - 1
+      thred = sorted(tag_prob_lst, reverse=True)[select_topn]
+      thresholds_dict[tag] = thred
+
+      select_tags_lst = [prob for prob in tag_prob_lst if prob >= thred]
+      select_tag_dict[tag].extend(select_tags_lst)
+  
+  if save:
+    with open(save_dict_path, 'wb') as handle:
+      pickle.dump(select_tag_dict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+    # with open('filename.pickle', 'rb') as handle:
+    #   b = pickle.load(handle)
+
+  return each_tags_dict, thresholds_dict
